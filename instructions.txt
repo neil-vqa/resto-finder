@@ -1,0 +1,11 @@
+server
+
+
+command 1:
+DOCKER_BUILDKIT=1 docker build -t resto-finder-server .
+
+command 2:
+docker run --name resto-finder-server -p 8000:8000 --user $(id -u):$(id -g) --env-file .env -d resto-finder-server
+
+command 2 (option 2 if using a self-hosted LLM):
+docker run --name resto-finder-server -p 8000:8000 --user $(id -u):$(id -g) --env-file .env --add-host=host.docker.internal:host-gateway -d resto-finder-server
