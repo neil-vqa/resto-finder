@@ -4,6 +4,7 @@ import os
 import openai
 import requests
 from dotenv import load_dotenv
+from openai.types.chat import ChatCompletion
 from requests.exceptions import HTTPError
 
 from .exceptions import LLMCallError, PlacesError
@@ -20,7 +21,7 @@ foursquare_key = os.getenv("FOURSQUARE_API_KEY")
 llm_client = openai.OpenAI(base_url=llm_server_url, api_key=llm_api_key)
 
 
-def call_llm(query):
+def call_llm(query: str) -> ChatCompletion:
     res_schema = {
         "title": "Restaurant Search",
         "type": "object",
@@ -92,7 +93,7 @@ def call_llm(query):
         return res
 
 
-def get_places(params):
+def get_places(params: dict) -> dict:
     url = "https://places-api.foursquare.com/places/search"
 
     headers = {
@@ -114,7 +115,7 @@ def get_places(params):
         return response.json()
 
 
-def get_place(place_id):
+def get_place(place_id: str) -> dict:
     url = f"https://places-api.foursquare.com/places/{place_id}"
 
     headers = {
