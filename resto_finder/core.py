@@ -1,10 +1,16 @@
+import logging
 import os
 
 import openai
 import requests
 from dotenv import load_dotenv
+from requests.exceptions import HTTPError
+
+from .exceptions import LLMCallError, PlacesError
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 llm_server_url = os.getenv("LLM_SERVER_URL")
 llm_api_key = os.getenv("LLM_API_KEY")
@@ -60,24 +66,30 @@ def call_llm(query):
 </json-schema>
 """
 
-    res = llm_client.chat.completions.create(
-        model="local_llm",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are an information extraction agent. You ALWAYS respond in JSON.",
-            },
-            {
-                "role": "user",
-                "content": prompt.format(query=query, target_schema=res_schema),
-            },
-        ],
-        max_tokens=2048,
-        temperature=0.2,
-        response_format={"type": "json_object", "schema": res_schema},
-    )
-
-    return res
+    try:
+        logger.info("Sending request to LLM.")
+        res = llm_client.chat.completions.create(
+            model="local_llm",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an information extraction agent. You ALWAYS respond in JSON.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt.format(query=query, target_schema=res_schema),
+                },
+            ],
+            max_tokens=2048,
+            temperature=0.2,
+            response_format={"type": "json_object", "schema": res_schema},
+        )
+    except Exception:
+        msg = "An error occurred while generating LLM response."
+        logger.exception(msg)
+        raise LLMCallError(msg) from None
+    else:
+        return res
 
 
 def get_places(params):
@@ -91,9 +103,15 @@ def get_places(params):
 
     params["sort"] = "RELEVANCE"
 
-    response = requests.get(url, headers=headers, params=params)
-
-    return response.json()
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=60)
+        response.raise_for_status()
+    except HTTPError:
+        msg = "An HTTTP error occurred while getting places."
+        logger.exception(msg)
+        raise PlacesError(msg) from None
+    else:
+        return response.json()
 
 
 def get_place(place_id):
@@ -105,6 +123,12 @@ def get_place(place_id):
         "authorization": f"Bearer {foursquare_key}",
     }
 
-    response = requests.get(url, headers=headers)
-
-    return response.json()
+    try:
+        response = requests.get(url, headers=headers, timeout=60)
+        response.raise_for_status()
+    except HTTPError:
+        msg = "An HTTTP error occurred while getting a place."
+        logger.exception(msg)
+        raise PlacesError(msg) from None
+    else:
+        return response.json()
